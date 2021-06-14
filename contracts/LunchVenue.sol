@@ -103,7 +103,7 @@ contract LunchVenue {
 
     /// @notice Only manager can do
     modifier restricted() {
-        require (msg.sender == manager, " Can only be executed by the manager");
+        require (msg.sender == manager, "Can only be executed by the manager");
         _;
     }
 
