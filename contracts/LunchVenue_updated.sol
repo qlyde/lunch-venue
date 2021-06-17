@@ -3,7 +3,15 @@
 pragma solidity ^0.8.0;
 
 /// @title Contract to agree on the lunch venue
+/// @author James Kroeger
 contract LunchVenue {
+    // [extension 2]
+    enum State {
+        Planning,
+        Voting,
+        Finished
+    }
+
     struct Friend {
         string name;
         bool voted;
@@ -14,17 +22,21 @@ contract LunchVenue {
         uint venue;
     }
 
+    address public manager; // Manager of lunch venues
+    State public state = State.Planning;
+
     mapping (uint => string) public venues; // List of venues (venue no, name)
     mapping (address => Friend) public friends; // List of friends (address, Friend)
     uint public numVenues = 0;
     uint public numFriends = 0;
     uint public numVotes = 0;
-    address public manager; // Manager of lunch venues
     string public votedVenue = ""; // Where to have lunch
 
     mapping (uint => Vote) private votes; // List of votes (vote no, Vote)
     mapping (uint => uint) private results; // List of vote counts (venue no, no of votes)
-    bool voteOpen = true; // voting is open
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////
+    ///////////////////////////////////////////////////////////////////////////////////////////////
 
     // Creates a new lunch venue contract
     constructor() {
@@ -35,7 +47,12 @@ contract LunchVenue {
     /// @dev To simplify the code duplication of venues is not checked
     /// @param name Name of the venue
     /// @return Number of lunch venues added so far
-    function addVenue(string memory name) public restricted returns (uint) {
+    function addVenue(string memory name)
+        public
+        restricted
+        stateIs(State.Planning)
+        returns (uint)
+    {
         numVenues++;
         venues[numVenues] = name;
         return numVenues;
@@ -46,7 +63,12 @@ contract LunchVenue {
     /// @param friendAddress Friend's account address
     /// @param name Friend's name
     /// @return Number of friends added so far
-    function addFriend(address friendAddress, string memory name) public restricted returns (uint) {
+    function addFriend(address friendAddress, string memory name)
+        public
+        restricted
+        stateIs(State.Planning)
+        returns (uint)
+    {
         Friend memory f;
         f.name = name;
         f.voted = false;
@@ -55,11 +77,21 @@ contract LunchVenue {
         return numFriends;
     }
 
+    /// @notice Begin voting stage
+    /// @dev Can only start voting after planning stage
+    function startVoting() public restricted stateIs(State.Planning) {
+        state = State.Voting;
+    }
+
     /// @notice Vote for a lunch venue
     /// @dev To simplify the code multiple votes by a friend is not checked
     /// @param venue Venue number being voted
     /// @return validVote Is the vote valid? A valid vote should be from a registered friend and to a registered venue
-    function doVote(uint venue) public votingOpen returns (bool validVote) {
+    function doVote(uint venue)
+        public
+        stateIs(State.Voting)
+        returns (bool validVote)
+    {
         validVote = false; // Is the vote valid?
         if (bytes(friends[msg.sender].name).length != 0) { // Does friend exist?
             if (bytes(venues[venue]).length != 0) { // Does venue exist?
@@ -98,18 +130,18 @@ contract LunchVenue {
             }
         }
         votedVenue = venues[highestVenue]; // Chosen lunch venue
-        voteOpen = false; // Voting is now closed
+        state = State.Finished; // Voting is now closed
+    }
+
+    /// @notice Check state is as expected
+    modifier stateIs(State _state) {
+        require(state == _state, "Function cannot be called in this state");
+        _;
     }
 
     /// @notice Only manager can do
     modifier restricted() {
-        require (msg.sender == manager, "Can only be executed by the manager");
-        _;
-    }
-
-    /// @notice Only when voting is still open
-    modifier votingOpen() {
-        require (voteOpen == true, "Can vote only while voting is open.");
+        require(msg.sender == manager, "Can only be executed by the manager");
         _;
     }
 }
