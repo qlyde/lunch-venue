@@ -103,13 +103,13 @@ contract LunchVenue {
 
     /// @notice Only manager can do
     modifier restricted() {
-        require (msg.sender == manager, "Can only be executed by the manager");
+        require(msg.sender == manager, "Can only be executed by the manager");
         _;
     }
 
     /// @notice Only when voting is still open
     modifier votingOpen() {
-        require (voteOpen == true, "Can vote only while voting is open.");
+        require(voteOpen == true, "Can vote only while voting is open.");
         _;
     }
 }
