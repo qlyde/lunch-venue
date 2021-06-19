@@ -9,8 +9,8 @@ contract LunchVenue {
     // An enumeration to track the current stage in the voting process.
     // -------------------------------------------------------------
     enum State {
-        Planning, // In this state, the manager can addVenue() and addFriend()
-        Voting, // In this state, friends can doVote()
+        Planning, // In this state, the `manager` can `addVenue()` and `addFriend()`
+        Voting, // In this state, a `Friend` can `doVote()`
         Finished // In this state, the voting process has finished and a venue may have been selected
         // Cancelled
     }
@@ -26,7 +26,7 @@ contract LunchVenue {
     }
 
     // ------------------------ EXTENSION 2 ------------------------
-    // The initial stage in the voting process is Planning.
+    // The initial stage in the voting process is `Planning`.
     // In this stage, the contract manager is responsible for adding friends and venues.
     // -------------------------------------------------------------
     State public state = State.Planning;
@@ -57,7 +57,8 @@ contract LunchVenue {
     function addVenue(string memory name)
         public
         restricted
-        stateIs(State.Planning) // ----- EXTENSION 2 ----- Must be in Planning stage to addVenue()
+        // ----- EXTENSION 2 ----- Must be in `Planning` stage to `addVenue()`
+        stateIs(State.Planning)
         returns (uint)
     {
         numVenues++;
@@ -73,7 +74,8 @@ contract LunchVenue {
     function addFriend(address friendAddress, string memory name)
         public
         restricted
-        stateIs(State.Planning) // ----- EXTENSION 2 ----- Must be in Planning stage to addFriend()
+        // ----- EXTENSION 2 ----- Must be in `Planning` stage to `addFriend()`
+        stateIs(State.Planning)
         returns (uint)
     {
         Friend memory f;
@@ -85,37 +87,37 @@ contract LunchVenue {
     }
 
     /// @notice Begin voting stage
-    /// @dev Can only start voting after planning stage
+    /// @dev Can only transition to `Voting` state from the `Planning` state
     function startVoting() public restricted stateIs(State.Planning) {
         state = State.Voting;
     }
 
     /// @notice Vote for a lunch venue
-    /// @dev To simplify the code multiple votes by a friend is not checked
     /// @param venue Venue number being voted
-    /// @return validVote Is the vote valid? A valid vote should be from a registered friend and to a registered venue
+    /// @return validVote Is the vote valid? A valid vote should be from a registered friend who hasn't voted and to a registered venue
     function doVote(uint venue)
         public
-        stateIs(State.Voting) // ----- EXTENSION 2 ----- Must be in Voting stage to doVote()
+        // ----- EXTENSION 2 ----- Must be in `Voting` stage to `doVote()`
+        stateIs(State.Voting)
         returns (bool validVote)
     {
-        validVote = false; // Is the vote valid?
-        if (bytes(friends[msg.sender].name).length != 0) { // Does friend exist?
-            if (bytes(venues[venue]).length != 0) { // Does venue exist?
-                validVote = true;
-                friends[msg.sender].voted = true;
-                Vote memory v;
-                v.voterAddress = msg.sender;
-                v.venue = venue;
-                numVotes++;
-                votes[numVotes] = v;
-            }
-        }
+        // ------------------------ EXTENSION 1 ------------------------
+        // Here we check if the voter has already voted and do not allow them to vote again if so.
+        // -------------------------------------------------------------
+        if (!canVoteFor(msg.sender, venue))
+            return false;
 
-        if (numVotes >= numFriends / 2 + 1) { // Quorum is met
+        friends[msg.sender].voted = true;
+        Vote memory v;
+        v.voterAddress = msg.sender;
+        v.venue = venue;
+        numVotes++;
+        votes[numVotes] = v;
+
+        if (numVotes >= numFriends / 2 + 1) // Quorum is met
             finalResult();
-        }
-        return validVote;
+
+        return true;
     }
 
     /// @notice Determine winner venue
@@ -138,6 +140,33 @@ contract LunchVenue {
         }
         votedVenue = venues[highestVenue]; // Chosen lunch venue
         state = State.Finished; // Voting is now closed
+    }
+
+    // ------------------------ EXTENSION 1 ------------------------
+    // A function to check if a given address is allowed to vote for a given venue.
+    // Here we also check if the voter has already voted and do not allow them to vote again if so.
+    // -------------------------------------------------------------
+    /// @notice Check if an address is able to vote for a venue
+    /// @dev `voterAddress` is not guaranteed to be a `Friend` so check that they are
+    /// @dev `voterAddress` may have already voted so do not allow them to vote again if so
+    /// @dev `venue` is not guaranteed to be a valid `Venue` so check that it is
+    /// @param voterAddress Address of the attempted voter
+    /// @param venue Venue being voted for
+    /// @return Can `voterAddress` vote for `venue`?
+    function canVoteFor(address voterAddress, uint venue) private view returns (bool) {
+        // Does friend exist?
+        if (bytes(friends[msg.sender].name).length == 0) return false;
+
+        // Does venue exist?
+        if (bytes(venues[venue]).length == 0) return false;
+
+        // ------------------------ EXTENSION 1 ------------------------
+        // A friend cannot vote more than once.
+        // This prevents monopolization of the voting.
+        // -------------------------------------------------------------
+        if (friends[voterAddress].voted) return false;
+
+        return true;
     }
 
     // ------------------------ EXTENSION 2 ------------------------
