@@ -31,6 +31,13 @@ contract LunchVenue {
     // -------------------------------------------------------------
     State public state = State.Planning;
 
+    // ------------------------ EXTENSION 3 ------------------------
+    // `timeoutBlock` is the block number at which the voting process will timeout.
+    // A timeout is signified by a transition to the `Finished` state.
+    // The `votedVenue` will be decided based on the current votes.
+    // -------------------------------------------------------------
+    uint public timeoutBlock;
+
     mapping (uint => string) public venues; // List of venues (venue no, name)
     mapping (address => Friend) public friends; // List of friends (address, Friend)
     uint public numVenues = 0;
@@ -38,16 +45,6 @@ contract LunchVenue {
     uint public numVotes = 0;
     address public manager; // Manager of lunch venues
     string public votedVenue = ""; // Where to have lunch
-
-    // ------------------------ EXTENSION 3 ------------------------
-    // `timeoutBlock` is the block number at which the voting process will timeout.
-    // A timeout is signified by a transition to the `Finished` state.
-    // The `votedVenue` will remain empty since the friends could not agree on a venue.
-    //
-    // The default `timeoutBlock` will be 280 blocks from the current block.
-    // With an average block time of 13 seconds the timeout will be approx. 60 minutes from contract creation.
-    // -------------------------------------------------------------
-    uint private timeoutBlock = block.number + 280;
 
     mapping (uint => Vote) private votes; // List of votes (vote no, Vote)
     mapping (uint => uint) private results; // List of vote counts (venue no, no of votes)
@@ -63,27 +60,45 @@ contract LunchVenue {
     // ------------------------ EXTENSION 3 ------------------------
     /// @notice Set the `timeoutBlock`
     /// @param blockNumber Block for timeout to occur
-    function setTimeout(uint blockNumber) public restricted {
-        require(state != State.Finished, "Voting process has already finished");
-        require(blockNumber >= block.number, "Timeout block cannot be in the past");
-        timeoutBlock = blockNumber;
+    /// @return New timeout block
+    function setTimeout(uint blockNumber)
+        public
+        restricted
+        stateIs(State.Voting)
+        returns (uint)
+    {
+        require(block.number >= timeoutBlock, "We have already timed out");
+        require(block.number <= blockNumber, "Timeout block cannot be in the past");
+        return timeoutBlock = blockNumber;
     }
 
     // ------------------------ EXTENSION 3 ------------------------
     /// @notice Extend the `timeoutBlock`
     /// @param nblocks Number of blocks to extend the timeout for
-    function extendTimeout(uint nblocks) public restricted {
-        require(state != State.Finished, "Voting process has already finished");
-        timeoutBlock += nblocks;
+    /// @return New timeout block
+    function extendTimeout(uint nblocks)
+        public
+        restricted
+        stateIs(State.Voting)
+        returns (uint)
+    {
+        require(block.number >= timeoutBlock, "We have already timed out");
+        return timeoutBlock += nblocks;
     }
 
     // ------------------------ EXTENSION 3 ------------------------
     /// @notice Reduce the `timeoutBlock`
     /// @param nblocks Number of blocks to reduce the timeout for
-    function reduceTimeout(uint nblocks) public restricted {
-        require(state != State.Finished, "Voting process has already finished");
-        require(timeoutBlock - nblocks >= block.number, "Timeout block cannot be in the past");
-        timeoutBlock -= nblocks;
+    /// @return New timeout block
+    function reduceTimeout(uint nblocks)
+        public
+        restricted
+        stateIs(State.Voting)
+        returns (uint)
+    {
+        require(block.number >= timeoutBlock, "We have already timed out");
+        require(block.number <= timeoutBlock - nblocks, "Timeout block cannot be in the past");
+        return timeoutBlock -= nblocks;
     }
 
     /// @notice Add a new lunch venue
@@ -92,7 +107,6 @@ contract LunchVenue {
     /// @return Number of lunch venues added so far
     function addVenue(string memory name)
         public
-        timeoutTransition // ----- EXTENSION 3 -----
         restricted
         // ----- EXTENSION 2 ----- Must be in `Planning` stage to `addVenue()`
         stateIs(State.Planning)
@@ -110,7 +124,6 @@ contract LunchVenue {
     /// @return Number of friends added so far
     function addFriend(address friendAddress, string memory name)
         public
-        timeoutTransition // ----- EXTENSION 3 -----
         restricted
         // ----- EXTENSION 2 ----- Must be in `Planning` stage to `addFriend()`
         stateIs(State.Planning)
@@ -131,11 +144,16 @@ contract LunchVenue {
     /// @dev Can only transition to `Voting` state from the `Planning` state
     function startVoting()
         public
-        timeoutTransition // ----- EXTENSION 3 -----
         restricted
         stateIs(State.Planning)
     {
         state = State.Voting;
+
+        // ------------------------ EXTENSION 3 ------------------------
+        // The default `timeoutBlock` will be 280 blocks from the current block.
+        // With an average block time of 13 seconds the timeout will be approx. 60 minutes from contract creation.
+        // -------------------------------------------------------------
+        timeoutBlock = block.number + 280;
     }
 
     /// @notice Vote for a lunch venue
@@ -144,10 +162,19 @@ contract LunchVenue {
     function doVote(uint venue)
         public
         // ----- EXTENSION 2 ----- Must be in `Voting` stage to `doVote()`
-        timeoutTransition // ----- EXTENSION 3 -----
         stateIs(State.Voting)
         returns (bool validVote)
     {
+        // ------------------------ EXTENSION 3 ------------------------
+        // Check if timeout has been reached.
+        // If so, call `finalResult()` to force a lunch venue to be chosen based on current votes.
+        // The state transitions to `Finished`.
+        // -------------------------------------------------------------
+        if (block.number >= timeoutBlock) {
+            finalResult();
+            return false;
+        }
+
         // ------------------------ EXTENSION 1 ------------------------
         // Here we check if the voter has already voted and do not allow them to vote again if so.
         // -------------------------------------------------------------
@@ -170,23 +197,32 @@ contract LunchVenue {
     /// @notice Determine winner venue
     /// @dev If top 2 venues have the same no of votes, final result depends on vote order
     function finalResult() private {
-        uint highestVotes = 0;
-        uint highestVenue = 0;
+        if (numVotes == 0) {
+            // ------------------------ EXTENSION 3 ------------------------
+            // If voting has timed out and there are no votes, set the `votedVenue` to "<UNDECIDED>".
+            // -------------------------------------------------------------
+            votedVenue = "<UNDECIDED>";
+        } else {
+            uint highestVotes = 0;
+            uint highestVenue = 0;
 
-        for (uint i = 1; i <= numVotes; i++) { // For each vote
-            uint voteCount = 1;
-            if (results[votes[i].venue] > 0) { // Already start counting
-                voteCount += results[votes[i].venue];
-            }
-            results[votes[i].venue] = voteCount;
+            for (uint i = 1; i <= numVotes; i++) { // For each vote
+                uint voteCount = 1;
+                if (results[votes[i].venue] > 0) { // Already start counting
+                    voteCount += results[votes[i].venue];
+                }
+                results[votes[i].venue] = voteCount;
 
-            if (voteCount > highestVotes) { // New winner
-                highestVotes = voteCount;
-                highestVenue = votes[i].venue;
+                if (voteCount > highestVotes) { // New winner
+                    highestVotes = voteCount;
+                    highestVenue = votes[i].venue;
+                }
             }
+
+            votedVenue = venues[highestVenue]; // Chosen lunch venue
         }
-        votedVenue = venues[highestVenue]; // Chosen lunch venue
-        state = State.Finished; // Voting is now closed
+
+        state = State.Finished; // ----- EXTENSION 2 ----- Voting is now closed
     }
 
     // ------------------------ EXTENSION 1 ------------------------
@@ -222,17 +258,14 @@ contract LunchVenue {
     /// @notice Check state is as expected
     /// @param _state Is the voting process in this state?
     modifier stateIs(State _state) {
-        require(state == _state, "Function cannot be called in this state");
-        _;
-    }
-
-    // ------------------------ EXTENSION 3 ------------------------
-    // A modifier to transition state to `Finished` if the `timeoutBlock` has been reached.
-    // This modifier must be mentioned first so that other modifiers account for potential state change.
-    // -------------------------------------------------------------
-    /// @notice Check if the voting process has timed out and end voting process if so
-    modifier timeoutTransition() {
-        if (block.number >= timeoutBlock) state = State.Finished;
+        if (state != _state) {
+            if (state == State.Planning)
+                require(false, "Function cannot be called in the Planning state");
+            else if (state == State.Voting)
+                require(false, "Function cannot be called in the Voting state");
+            else if (state == State.Finished)
+                require(false, "Function cannot be called in the Finished state");
+        }
         _;
     }
 
