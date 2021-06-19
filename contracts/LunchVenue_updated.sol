@@ -2,6 +2,28 @@
 
 pragma solidity ^0.8.0;
 
+// An extension of /contracts/LunchVenue.sol
+//
+// (1)  A friend can vote more than once. While this was handy in testing our contract, it is undesirable
+//      as one can monopolize the selected venue. Ideally, we should record a vote for a given address only
+//      once
+//
+// (2)  While the contract is stuck at doVote function, other functions can still be called. Also, once the
+//      voting starts, new venues and friends can be added, making the whole process chaotic. In a typical
+//      voting process, voters are clear about who would vote and what to vote on before voting starts to
+//      prevent any disputes. Hence, a good vote process should have well-defined create, vote open, and
+//      end phases
+//
+// (3)  If the quorum is not reached by the lunchtime, no consensus will be reached on the lunch venue.
+//      Hence, the contract needs a timeout. However, the wallclock time on a blockchain is not accurate
+//      due to clock skew. Hence, the timeout needs to be defined as a block number
+//
+// (4)  There is no way to disable the contract once it is deployed. Even the manager cannot do anything
+//      to stop the contract in case the team lunch has to be cancelled
+//
+// (5)  Gas consumption is not optimized. More simple data structures could help to reduce the transaction
+//      cost
+
 /// @title Contract to agree on the lunch venue
 /// @author James Kroeger
 contract LunchVenue {
