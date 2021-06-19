@@ -33,8 +33,12 @@ contract LunchVenue {
     enum State {
         Planning, // In this state, the `manager` can `addVenue()` and `addFriend()`
         Voting, // In this state, a `Friend` can `doVote()`
-        Finished // In this state, the voting process has finished and a venue may have been selected
-        // Cancelled
+        Finished, // In this state, the voting process has finished and a venue may have been selected
+
+        // ------------------------ EXTENSION 4 ------------------------
+        // In this state, the contract is disabled and the team lunch is cancelled.
+        // -------------------------------------------------------------
+        Cancelled // In this state, all functions are disabled and will revert
     }
 
     struct Friend {
@@ -77,6 +81,14 @@ contract LunchVenue {
     // Creates a new lunch venue contract
     constructor() {
         manager = msg.sender; // Set contract creator as manager
+    }
+
+    // ------------------------ EXTENSION 4 ------------------------
+    // A way for the manager to disable the contract and cancel the team lunch.
+    // -------------------------------------------------------------
+    /// @notice Disable the contract by transitioning to a `Cancelled` state.
+    function disable() public restricted {
+        state = State.Cancelled;
     }
 
     // ------------------------ EXTENSION 3 ------------------------
@@ -190,7 +202,7 @@ contract LunchVenue {
         // ------------------------ EXTENSION 3 ------------------------
         // Check if timeout has been reached.
         // If so, call `finalResult()` to force a lunch venue to be chosen based on current votes.
-        // The state transitions to `Finished`.
+        // The state transitions to `Finished` and invalidates the current vote.
         // -------------------------------------------------------------
         if (block.number >= timeoutBlock) {
             finalResult();
@@ -287,6 +299,8 @@ contract LunchVenue {
                 require(false, "Function cannot be called in the Voting state");
             else if (state == State.Finished)
                 require(false, "Function cannot be called in the Finished state");
+            else if (state == State.Cancelled)
+                require(false, "The contract is disabled and the team lunch has been cancelled");
         }
         _;
     }
