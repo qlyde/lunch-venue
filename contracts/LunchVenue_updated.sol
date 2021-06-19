@@ -72,8 +72,16 @@ contract LunchVenue {
     address public manager; // Manager of lunch venues
     string public votedVenue = ""; // Where to have lunch
 
-    mapping (uint => Vote) private votes; // List of votes (vote no, Vote)
-    mapping (uint => uint) private results; // List of vote counts (venue no, no of votes)
+    // ------------------------ EXTENSION 5 ------------------------
+    // The `votes` mapping is not necessary. Remove it for optimisation.
+    // We can instead keep a rolling count of votes in the `results` array.
+    // -------------------------------------------------------------
+    // mapping (uint => Vote) private votes; // List of votes (vote no, Vote)
+
+    // ------------------------ EXTENSION 5 ------------------------
+    // To optimise gas consumption, `results` can be a `uint[]` instead of a `mapping(uint => uint)`.
+    // -------------------------------------------------------------
+    uint[] private results; // List of vote counts results[venue] is the no of votes for this venue
 
     // -------------------------------------------------------------
     // -------------------------------------------------------------
@@ -102,7 +110,7 @@ contract LunchVenue {
         returns (uint)
     {
         require(block.number >= timeoutBlock, "We have already timed out");
-        require(block.number <= blockNumber, "Timeout block cannot be in the past");
+        require(block.number < blockNumber, "Timeout block cannot be in the past");
         return timeoutBlock = blockNumber;
     }
 
@@ -131,7 +139,7 @@ contract LunchVenue {
         returns (uint)
     {
         require(block.number >= timeoutBlock, "We have already timed out");
-        require(block.number <= timeoutBlock - nblocks, "Timeout block cannot be in the past");
+        require(block.number < timeoutBlock - nblocks, "Timeout block cannot be in the past");
         return timeoutBlock -= nblocks;
     }
 
@@ -142,7 +150,7 @@ contract LunchVenue {
     function addVenue(string memory name)
         public
         restricted
-        // ----- EXTENSION 2 ----- Must be in `Planning` stage to `addVenue()`
+        // ----- EXTENSION 2 ----- Must be in `Planning` stage to `addVenue()`.
         stateIs(State.Planning)
         returns (uint)
     {
@@ -159,7 +167,7 @@ contract LunchVenue {
     function addFriend(address friendAddress, string memory name)
         public
         restricted
-        // ----- EXTENSION 2 ----- Must be in `Planning` stage to `addFriend()`
+        // ----- EXTENSION 2 ----- Must be in `Planning` stage to `addFriend()`.
         stateIs(State.Planning)
         returns (uint)
     {
@@ -195,7 +203,7 @@ contract LunchVenue {
     /// @return validVote Is the vote valid? A valid vote should be from a registered friend who hasn't voted and to a registered venue
     function doVote(uint venue)
         public
-        // ----- EXTENSION 2 ----- Must be in `Voting` stage to `doVote()`
+        // ----- EXTENSION 2 ----- Must be in `Voting` stage to `doVote()`.
         stateIs(State.Voting)
         returns (bool validVote)
     {
@@ -216,11 +224,18 @@ contract LunchVenue {
             return false;
 
         friends[msg.sender].voted = true;
-        Vote memory v;
-        v.voterAddress = msg.sender;
-        v.venue = venue;
         numVotes++;
-        votes[numVotes] = v;
+
+        // ------------------------ EXTENSION 5 ------------------------
+        // This is not needed and can we optimise gas usage by removing it.
+        // This also 'anonymises' voting.
+        // We simply need to increase the rolling count of votes for this venue.
+        // -------------------------------------------------------------
+        // Vote memory v;
+        // v.voterAddress = msg.sender;
+        // v.venue = venue;
+        // votes[numVotes] = v;
+        results[venue]++;
 
         if (numVotes >= numFriends / 2 + 1) // Quorum is met
             finalResult();
@@ -240,23 +255,31 @@ contract LunchVenue {
             uint highestVotes = 0;
             uint highestVenue = 0;
 
-            for (uint i = 1; i <= numVotes; i++) { // For each vote
-                uint voteCount = 1;
-                if (results[votes[i].venue] > 0) { // Already start counting
-                    voteCount += results[votes[i].venue];
-                }
-                results[votes[i].venue] = voteCount;
+            // ------------------------ EXTENSION 5 ------------------------
+            // -------------------------------------------------------------
+            // for (uint i = 1; i <= numVotes; i++) { // For each vote
+            //     uint voteCount = 1;
+            //     if (results[votes[i].venue] > 0) { // Already start counting
+            //         voteCount += results[votes[i].venue];
+            //     }
+            //     results[votes[i].venue] = voteCount;
 
-                if (voteCount > highestVotes) { // New winner
-                    highestVotes = voteCount;
-                    highestVenue = votes[i].venue;
+            //     if (voteCount > highestVotes) { // New winner
+            //         highestVotes = voteCount;
+            //         highestVenue = votes[i].venue;
+            //     }
+            // }
+            for (uint i = 1; i <= numVenues; i++) { // For each venue
+                if (results[i] >= highestVotes) {
+                    highestVotes = results[i];
+                    highestVenue = i;
                 }
             }
 
             votedVenue = venues[highestVenue]; // Chosen lunch venue
         }
 
-        state = State.Finished; // ----- EXTENSION 2 ----- Voting is now closed
+        state = State.Finished; // ----- EXTENSION 2 ----- Voting is now closed.
     }
 
     // ------------------------ EXTENSION 1 ------------------------
