@@ -31,7 +31,7 @@ contract LunchVenue {
     // An enumeration to track the current stage in the voting process.
     // -------------------------------------------------------------
     enum State {
-        Planning, // In this state, the `manager` can `addVenue()` and `addFriend()`
+        Planning, // In this state, the `manager` can `addVenue()` and `addFriend()` and `startVoting()`
         Voting, // In this state, a `Friend` can `doVote()`
         Finished, // In this state, the voting process has finished and a venue may have been selected
 
@@ -193,7 +193,7 @@ contract LunchVenue {
 
         // ------------------------ EXTENSION 3 ------------------------
         // The default `timeoutBlock` will be 280 blocks from the current block.
-        // With an average block time of 13 seconds the timeout will be approx. 60 minutes from contract creation.
+        // With an average block time of 13 seconds the timeout will be approx. 60 minutes.
         // -------------------------------------------------------------
         timeoutBlock = block.number + 280;
     }
