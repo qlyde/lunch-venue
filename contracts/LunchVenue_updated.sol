@@ -5,11 +5,14 @@ pragma solidity ^0.8.0;
 /// @title Contract to agree on the lunch venue
 /// @author James Kroeger
 contract LunchVenue {
-    // [extension 2]
+    // ------------------------ EXTENSION 2 ------------------------
+    // An enumeration to track the current stage in the voting process.
+    // -------------------------------------------------------------
     enum State {
-        Planning,
-        Voting,
-        Finished
+        Planning, // In this state, the manager can addVenue() and addFriend()
+        Voting, // In this state, friends can doVote()
+        Finished // In this state, the voting process has finished and a venue may have been selected
+        // Cancelled
     }
 
     struct Friend {
@@ -22,7 +25,10 @@ contract LunchVenue {
         uint venue;
     }
 
-    address public manager; // Manager of lunch venues
+    // ------------------------ EXTENSION 2 ------------------------
+    // The initial stage in the voting process is Planning.
+    // In this stage, the contract manager is responsible for adding friends and venues.
+    // -------------------------------------------------------------
     State public state = State.Planning;
 
     mapping (uint => string) public venues; // List of venues (venue no, name)
@@ -30,13 +36,14 @@ contract LunchVenue {
     uint public numVenues = 0;
     uint public numFriends = 0;
     uint public numVotes = 0;
+    address public manager; // Manager of lunch venues
     string public votedVenue = ""; // Where to have lunch
 
     mapping (uint => Vote) private votes; // List of votes (vote no, Vote)
     mapping (uint => uint) private results; // List of vote counts (venue no, no of votes)
 
-    ///////////////////////////////////////////////////////////////////////////////////////////////
-    ///////////////////////////////////////////////////////////////////////////////////////////////
+    // -------------------------------------------------------------
+    // -------------------------------------------------------------
 
     // Creates a new lunch venue contract
     constructor() {
@@ -50,7 +57,7 @@ contract LunchVenue {
     function addVenue(string memory name)
         public
         restricted
-        stateIs(State.Planning)
+        stateIs(State.Planning) // ----- EXTENSION 2 ----- Must be in Planning stage to addVenue()
         returns (uint)
     {
         numVenues++;
@@ -66,7 +73,7 @@ contract LunchVenue {
     function addFriend(address friendAddress, string memory name)
         public
         restricted
-        stateIs(State.Planning)
+        stateIs(State.Planning) // ----- EXTENSION 2 ----- Must be in Planning stage to addFriend()
         returns (uint)
     {
         Friend memory f;
@@ -89,7 +96,7 @@ contract LunchVenue {
     /// @return validVote Is the vote valid? A valid vote should be from a registered friend and to a registered venue
     function doVote(uint venue)
         public
-        stateIs(State.Voting)
+        stateIs(State.Voting) // ----- EXTENSION 2 ----- Must be in Voting stage to doVote()
         returns (bool validVote)
     {
         validVote = false; // Is the vote valid?
@@ -133,7 +140,11 @@ contract LunchVenue {
         state = State.Finished; // Voting is now closed
     }
 
+    // ------------------------ EXTENSION 2 ------------------------
+    // A modifier to check the current state of the contract.
+    // -------------------------------------------------------------
     /// @notice Check state is as expected
+    /// @param _state Is the voting process in this state?
     modifier stateIs(State _state) {
         require(state == _state, "Function cannot be called in this state");
         _;
