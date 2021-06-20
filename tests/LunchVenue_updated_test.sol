@@ -147,6 +147,7 @@ contract LunchVenueTestExt1 is LunchVenue {
     }
 }
 
+
 /// ------------------------ EXTENSION 2 ------------------------
 /// Test extension 2 works as expected.
 /// Check that functions can only be called in certain states.
@@ -406,3 +407,223 @@ contract LunchVenueTestExt2 is LunchVenue {
     }
 }
 
+
+/// ------------------------ EXTENSION 3 ------------------------
+/// Test extension 3 works as expected.
+///
+/// We test the following:
+///     - Setting timeout to a block in the past.
+///     - Attempting to change timeout once we have already timed out.
+///     - Setting timeouts successfully.
+///     - If we timeout with no votes, selected venue should be "<UNDECIDED>".
+/// -------------------------------------------------------------
+contract LunchVenueTestExt3 is LunchVenue {
+    using BytesLib for bytes;
+
+    // Variables used to emulate different accounts
+    address acc0;
+    address acc1;
+    address acc2;
+    address acc3;
+    address acc4;
+
+    /// 'beforeAll' runs before all other tests
+    /// More special functions are: 'beforeEach', 'beforeAll', 'afterEach' & 'afterAll'
+    function beforeAll() public {
+        acc0 = TestsAccounts.getAccount(0); // Initiate account variables
+        acc1 = TestsAccounts.getAccount(1);
+        acc2 = TestsAccounts.getAccount(2);
+        acc3 = TestsAccounts.getAccount(3);
+        acc4 = TestsAccounts.getAccount(4);
+    }
+
+    /// Add lunch venue as manager
+    function setLunchVenue() public {
+        Assert.equal(addVenue('Courtyard Cafe'), 1, 'Should be equal to 1');
+        Assert.equal(addVenue('Uni Cafe'), 2, 'Should be equal to 2');
+    }
+
+    /// Set friends as account-0
+    /// #sender doesn't need to be specified explicitly for account-0
+    function setFriend() public {
+        Assert.equal(addFriend(acc0, 'Alice'), 1, 'Should be equal to 1');
+        Assert.equal(addFriend(acc1, 'Bob'), 2, 'Should be equal to 2');
+        Assert.equal(addFriend(acc2, 'Charlie'), 3, 'Should be equal to 3');
+        Assert.equal(addFriend(acc3, 'Eve'), 4, 'Should be equal to 4');
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // When we start voting the timeout should be correctly set.
+    // -------------------------------------------------------------
+    /// Start voting
+    /// Test that state transitions correctly
+    /// Test that timeout is set correctly
+    function startVotingStage() public {
+        // ----- EXTENSION 3 -----
+        Assert.equal(timeoutBlock, 0, "timeoutBlock should not yet be set");
+        uint currBlock = block.number;
+
+        Assert.equal(uint(state), uint(State.Planning), "State should be Planning");
+        startVoting();
+        Assert.equal(uint(state), uint(State.Voting), "State should be Voting");
+
+        // ----- EXTENSION 3 -----
+        Assert.equal(timeoutBlock, currBlock + 280, "timeoutBlock not correctly set");
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Setting timeout to a block in the past.
+    // -------------------------------------------------------------
+    /// Attempt to set timeout to block 0
+    function setTimeoutToPast() public {
+        (bool success, bytes memory result) = address(this).delegatecall(abi.encodeWithSignature("setTimeout(uint256)", 0));
+        if (success == false) {
+            string memory reason = abi.decode(result.slice(4, result.length - 4), (string));
+            Assert.equal(reason, 'Timeout block cannot be in the past', 'Failed with unexpected reason');
+        } else {
+            Assert.ok(false, 'Method Execution should fail');
+        }
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Setting timeout to a block in the past.
+    // -------------------------------------------------------------
+    /// Attempt to reduce timeout to block 0
+    function reduceTimeoutToPast() public {
+        uint reduceAmt = timeoutBlock;
+        (bool success, bytes memory result) = address(this).delegatecall(abi.encodeWithSignature("reduceTimeout(uint256)", reduceAmt));
+        if (success == false) {
+            string memory reason = abi.decode(result.slice(4, result.length - 4), (string));
+            Assert.equal(reason, 'Timeout block cannot be in the past', 'Failed with unexpected reason');
+        } else {
+            Assert.ok(false, 'Method Execution should fail');
+        }
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Setting timeout as a user other than manager.
+    // -------------------------------------------------------------
+    /// Attempt to set timeout as account-1
+    /// #sender: account-1
+    function changeTimeoutAsNonManagerFailure() public {
+        (bool success, bytes memory result) = address(this).delegatecall(abi.encodeWithSignature("extendTimeout(uint256)", 1));
+        if (success == false) {
+            string memory reason = abi.decode(result.slice(4, result.length - 4), (string));
+            Assert.equal(reason, 'Can only be executed by the manager', 'Failed with unexpected reason');
+        } else {
+            Assert.ok(false, 'Method Execution should fail');
+        }
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Extending timeout successfully.
+    // -------------------------------------------------------------
+    /// Extend timeout by 100 blocks
+    function extendTimeoutSuccess() public {
+        uint expected = timeoutBlock + 100;
+        extendTimeout(100);
+        Assert.equal(timeoutBlock, expected, "Timeout is not as expected");
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Reducing timeout successfully.
+    // -------------------------------------------------------------
+    /// Reduce timeout by 1 block
+    function reduceTimeoutSuccess() public {
+        uint expected = timeoutBlock - 1;
+        reduceTimeout(1);
+        Assert.equal(timeoutBlock, expected, "Timeout is not as expected");
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Setting timeout successfully.
+    // -------------------------------------------------------------
+    /// Set timeout to 5 blocks in the future.
+    function setTimeoutSuccess() public {
+        uint target = block.number + 5;
+        setTimeout(target);
+        Assert.equal(timeoutBlock, target, "Timeout is not as expected");
+    }
+
+    /// Force a timeout
+    function forceTimeout() public {
+        setTimeout(block.number);
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Changing the timeout once already timed out.
+    // -------------------------------------------------------------
+    /// Attempt to extend timeout by 100 blocks after timeout
+    function extendTimeoutAfterTimeout() public {
+        (bool success, bytes memory result) = address(this).delegatecall(abi.encodeWithSignature("extendTimeout(uint256)", 100));
+        if (success == false) {
+            string memory reason = abi.decode(result.slice(4, result.length - 4), (string));
+            Assert.equal(reason, 'We have already timed out', 'Failed with unexpected reason');
+        } else {
+            Assert.ok(false, 'Method Execution should fail');
+        }
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Changing the timeout once already timed out.
+    // -------------------------------------------------------------
+    /// Attempt to reduce timeout by 1 block after timeout
+    function reduceTimeoutAfterTimeout() public {
+        (bool success, bytes memory result) = address(this).delegatecall(abi.encodeWithSignature("reduceTimeout(uint256)", 1));
+        if (success == false) {
+            string memory reason = abi.decode(result.slice(4, result.length - 4), (string));
+            Assert.equal(reason, 'We have already timed out', 'Failed with unexpected reason');
+        } else {
+            Assert.ok(false, 'Method Execution should fail');
+        }
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Changing the timeout once already timed out.
+    // -------------------------------------------------------------
+    /// Attempt to set timeout after timeout
+    function setTimeoutAfterTimeout() public {
+        (bool success, bytes memory result) = address(this).delegatecall(abi.encodeWithSignature("setTimeout(uint256)", block.number + 5));
+        if (success == false) {
+            string memory reason = abi.decode(result.slice(4, result.length - 4), (string));
+            Assert.equal(reason, 'We have already timed out', 'Failed with unexpected reason');
+        } else {
+            Assert.ok(false, 'Method Execution should fail');
+        }
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Voting after timeout.
+    // This triggers the state transition to `Finished` and invalidates the vote
+    // -------------------------------------------------------------
+    /// Attempt to vote after timeout then check that state is `Finished`
+    /// #sender: account-1
+    function voteAfterTimeout() public {
+        Assert.equal(doVote(1), false, 'Cannot vote after timeout');
+        Assert.equal(uint(state), uint(State.Finished), "State should be Finished");
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Voting after timeout.
+    // State is now `Finished` so this should revert.
+    // -------------------------------------------------------------
+    /// Attempt to vote after timeout in Finished state
+    /// #sender: account-2
+    function voteAfterTimeout2() public {
+        (bool success, bytes memory result) = address(this).delegatecall(abi.encodeWithSignature("doVote(uint256)", 1));
+        if (success == false) {
+            string memory reason = abi.decode(result.slice(4, result.length - 4), (string));
+            Assert.equal(reason, 'Function cannot be called in the Finished state', 'Failed with unexpected reason');
+        } else {
+            Assert.ok(false, 'Method Execution should fail');
+        }
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Timeout reached with no votes.
+    // -------------------------------------------------------------
+    /// Verify lunch venue is undecided
+    function lunchVenueUndecidedTest() public {
+        Assert.equal(votedVenue, '<UNDECIDED>', 'Selected venue should be <UNDECIDED>');
+    }
+}
