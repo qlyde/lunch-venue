@@ -1,2 +1,2 @@
-/contracts/LunchVenue.sol           0x6c6594e00a16fbe59bba12803d30670a2f60b470
+/contracts/LunchVenue.sol           0x6c6594e00A16fbE59bBA12803D30670A2F60B470
 /contracts/LunchVenue_updated.sol   0x3C5938C1384A09692131109ebc438666b3d004E9
