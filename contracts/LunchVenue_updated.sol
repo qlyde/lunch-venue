@@ -111,7 +111,7 @@ contract LunchVenue {
         stateIs(State.Voting)
         returns (uint)
     {
-        require(block.number >= timeoutBlock, "We have already timed out");
+        require(block.number < timeoutBlock, "We have already timed out");
         require(block.number < blockNumber, "Timeout block cannot be in the past");
         return timeoutBlock = blockNumber;
     }
@@ -126,7 +126,7 @@ contract LunchVenue {
         stateIs(State.Voting)
         returns (uint)
     {
-        require(block.number >= timeoutBlock, "We have already timed out");
+        require(block.number < timeoutBlock, "We have already timed out");
         return timeoutBlock += nblocks;
     }
 
@@ -140,7 +140,7 @@ contract LunchVenue {
         stateIs(State.Voting)
         returns (uint)
     {
-        require(block.number >= timeoutBlock, "We have already timed out");
+        require(block.number < timeoutBlock, "We have already timed out");
         require(block.number < timeoutBlock - nblocks, "Timeout block cannot be in the past");
         return timeoutBlock -= nblocks;
     }
