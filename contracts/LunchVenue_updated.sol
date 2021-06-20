@@ -46,6 +46,7 @@ contract LunchVenue {
         bool voted;
     }
 
+    // This is not used
     struct Vote {
         address voterAddress;
         uint venue;
@@ -245,6 +246,7 @@ contract LunchVenue {
 
     /// @notice Determine winner venue
     /// @dev If top 2 venues have the same no of votes, final result depends on vote order
+    /// @dev If top 2 venues have the same no of votes, final result depends on venue order // ----- EXTENSION 5 -----
     function finalResult() private {
         if (numVotes == 0) {
             // ------------------------ EXTENSION 3 ------------------------
@@ -256,6 +258,9 @@ contract LunchVenue {
             uint highestVenue = 0;
 
             // ------------------------ EXTENSION 5 ------------------------
+            // Here we optimise the logic to reduce gas consumption.
+            // We iterate through the number of venues which is most likely to be less than the number of votes.
+            // We also don't need to add up the votes since we kept a rolling count instead.
             // -------------------------------------------------------------
             // for (uint i = 1; i <= numVotes; i++) { // For each vote
             //     uint voteCount = 1;
