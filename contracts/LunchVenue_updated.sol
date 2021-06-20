@@ -276,7 +276,7 @@ contract LunchVenue {
             //     }
             // }
             for (uint i = 1; i <= numVenues; i++) { // For each venue
-                if (results[i - 1] >= highestVotes) {
+                if (results[i - 1] > highestVotes) {
                     highestVotes = results[i - 1];
                     highestVenue = i;
                 }
