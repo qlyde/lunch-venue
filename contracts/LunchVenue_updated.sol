@@ -82,7 +82,7 @@ contract LunchVenue {
     // ------------------------ EXTENSION 5 ------------------------
     // To optimise gas consumption, `results` can be a `uint[]` instead of a `mapping(uint => uint)`.
     // -------------------------------------------------------------
-    uint[] private results; // List of vote counts results[venue] is the no of votes for this venue
+    uint[] private results; // List of vote counts results[venue - 1] is the no of votes for this venue
 
     // -------------------------------------------------------------
     // -------------------------------------------------------------
@@ -157,6 +157,7 @@ contract LunchVenue {
     {
         numVenues++;
         venues[numVenues] = name;
+        results.push(0); // ----- EXTENSION 5 -----
         return numVenues;
     }
 
@@ -236,7 +237,7 @@ contract LunchVenue {
         // v.voterAddress = msg.sender;
         // v.venue = venue;
         // votes[numVotes] = v;
-        results[venue]++;
+        results[venue - 1]++;
 
         if (numVotes >= numFriends / 2 + 1) // Quorum is met
             finalResult();
@@ -275,8 +276,8 @@ contract LunchVenue {
             //     }
             // }
             for (uint i = 1; i <= numVenues; i++) { // For each venue
-                if (results[i] >= highestVotes) {
-                    highestVotes = results[i];
+                if (results[i - 1] >= highestVotes) {
+                    highestVotes = results[i - 1];
                     highestVenue = i;
                 }
             }
