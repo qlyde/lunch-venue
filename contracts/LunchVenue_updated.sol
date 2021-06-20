@@ -98,6 +98,7 @@ contract LunchVenue {
     /// @notice Disable the contract by transitioning to a `Cancelled` state.
     function disable() public restricted {
         state = State.Cancelled;
+        votedVenue = "<CANCELLED>";
     }
 
     // ------------------------ EXTENSION 3 ------------------------
