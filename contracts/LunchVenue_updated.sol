@@ -246,7 +246,6 @@ contract LunchVenue {
     }
 
     /// @notice Determine winner venue
-    /// @dev If top 2 venues have the same no of votes, final result depends on vote order
     /// @dev If top 2 venues have the same no of votes, final result depends on venue order // ----- EXTENSION 5 -----
     function finalResult() private {
         if (numVotes == 0) {
