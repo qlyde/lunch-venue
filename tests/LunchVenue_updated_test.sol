@@ -163,7 +163,6 @@ contract LunchVenueTestExt2 is LunchVenue {
     address acc4;
 
     /// 'beforeAll' runs before all other tests
-    /// More special functions are: 'beforeEach', 'beforeAll', 'afterEach' & 'afterAll'
     function beforeAll() public {
         acc0 = TestsAccounts.getAccount(0); // Initiate account variables
         acc1 = TestsAccounts.getAccount(1);
@@ -423,7 +422,6 @@ contract LunchVenueTestExt3 is LunchVenue {
     address acc1;
 
     /// 'beforeAll' runs before all other tests
-    /// More special functions are: 'beforeEach', 'beforeAll', 'afterEach' & 'afterAll'
     function beforeAll() public {
         acc0 = TestsAccounts.getAccount(0); // Initiate account variables
         acc1 = TestsAccounts.getAccount(1);
@@ -461,5 +459,100 @@ contract LunchVenueTestExt3 is LunchVenue {
         } else {
             Assert.ok(false, 'Method Execution should fail');
         }
+    }
+}
+
+
+/// ------------------------ EXTENSION 4 ------------------------
+/// Test extension 4 works as expected.
+/// Once contract is cancelled all functions should be disabled.
+/// Also the `votedVenue` should be "<CANCELLED>".
+/// -------------------------------------------------------------
+contract LunchVenueTestExt4 is LunchVenue {
+    using BytesLib for bytes;
+
+    // Variables used to emulate different accounts
+    address acc0;
+    address acc1;
+
+    /// 'beforeAll' runs before all other tests
+    function beforeAll() public {
+        acc0 = TestsAccounts.getAccount(0); // Initiate account variables
+        acc1 = TestsAccounts.getAccount(1);
+    }
+
+    // ------------------------ EXTENSION 4 ------------------------
+    // Cancel contract as a user other than manager.
+    // -------------------------------------------------------------
+    /// Cancel contract as acc1. This should fail
+    /// #sender: account-1
+    function cancelLunchFailure() public {
+        (bool success, bytes memory result) = address(this).delegatecall(abi.encodeWithSignature("disable()"));
+        if (success == false) {
+            string memory reason = abi.decode(result.slice(4, result.length - 4), (string));
+            Assert.equal(reason, 'Can only be executed by the manager', 'Failed with unexpected reason');
+        } else {
+            Assert.ok(false, 'Method Execution should fail');
+        }
+    }
+
+    // ------------------------ EXTENSION 4 ------------------------
+    // Cancel contract and check state is `Cancelled`.
+    // -------------------------------------------------------------
+    /// Cancel contract
+    function cancelLunch() public {
+        Assert.equal(uint(state), uint(State.Planning), "State should be Planning");
+        disable();
+        Assert.equal(uint(state), uint(State.Cancelled), "State should be Cancelled");
+    }
+
+    // ------------------------ EXTENSION 3 ------------------------
+    // Attempt to call some functions after contract is cancelled.
+    // -------------------------------------------------------------
+    /// Try and use cancelled contract
+    function useCancelledContract() public {
+        // add venue
+        (bool success, bytes memory result) = address(this).delegatecall(abi.encodeWithSignature("addVenue(string)", "Uni Cafe"));
+        if (success == false) {
+            string memory reason = abi.decode(result.slice(4, result.length - 4), (string));
+            Assert.equal(reason, 'The contract is disabled and the team lunch has been cancelled', 'Failed with unexpected reason');
+        } else {
+            Assert.ok(false, 'Method Execution should fail');
+        }
+
+        // add friend
+        (success, result) = address(this).delegatecall(abi.encodeWithSignature("addFriend(address,string)", acc0, "James"));
+        if (success == false) {
+            string memory reason = abi.decode(result.slice(4, result.length - 4), (string));
+            Assert.equal(reason, 'The contract is disabled and the team lunch has been cancelled', 'Failed with unexpected reason');
+        } else {
+            Assert.ok(false, 'Method Execution should fail');
+        }
+
+        // start voting
+        (success, result) = address(this).delegatecall(abi.encodeWithSignature("startVoting()"));
+        if (success == false) {
+            string memory reason = abi.decode(result.slice(4, result.length - 4), (string));
+            Assert.equal(reason, 'The contract is disabled and the team lunch has been cancelled', 'Failed with unexpected reason');
+        } else {
+            Assert.ok(false, 'Method Execution should fail');
+        }
+
+        // do vote
+        (success, result) = address(this).delegatecall(abi.encodeWithSignature("doVote(uint256)", 1));
+        if (success == false) {
+            string memory reason = abi.decode(result.slice(4, result.length - 4), (string));
+            Assert.equal(reason, 'The contract is disabled and the team lunch has been cancelled', 'Failed with unexpected reason');
+        } else {
+            Assert.ok(false, 'Method Execution should fail');
+        }
+    }
+
+    // ------------------------ EXTENSION 4 ------------------------
+    // Check `votedVenue` is "<CANCELLED>" after cancelling.
+    // -------------------------------------------------------------
+    /// Check what the voted venue is
+    function checkVotedVenue() public {
+        Assert.equal(votedVenue, "<CANCELLED>", "The voted venue should be <CANCELLED>");
     }
 }
